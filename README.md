@@ -46,3 +46,22 @@ look something like this:
 
 You'll be prompted before each major action; you can either type y or n -
 hitting return/enter is the same as typing n.
+
+Other options:
+
+```
+usage: slayer [-h] [-k KEY] [-s SECRET] -r REGION [-l LINES]
+
+Manage your warrior cluster.
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -k KEY, --key KEY     AWS key.
+  -s SECRET, --secret SECRET
+                        AWS secret.
+  -r REGION, --region REGION
+                        The AWS region to operate in.
+  -l LINES, --lines LINES
+                        Number of lines of console output to show from each
+                        warrior.
+```
