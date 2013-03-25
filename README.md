@@ -13,6 +13,12 @@ These can both be installed with `pip`, see `install.sh`.
 
 ## Setup
 
+Clone this repository like so:
+```
+git clone git@github.com:duggan/slayer.git
+cd slayer
+```
+
 You will need your AWS access key and secret key in the environment, or
 supplied on the command line.
 
