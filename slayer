@@ -50,7 +50,7 @@ if len(instances) == 0:
 response = raw_input("Found %s running spot instances - continue? (y/n) " % len(instances))
 if response.strip() != 'y':
     print "Okay, exiting."
-    exit(1)
+    exit(0)
 
 print "Running machine checks. This could take a while if there's a lot of instances..."
 
