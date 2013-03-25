@@ -1,0 +1,135 @@
+#!/usr/bin/env python
+
+import os
+import readline
+from argparse import ArgumentParser
+import boto.ec2
+import ansible.runner
+from ansible import inventory
+
+parser = ArgumentParser(description='Manage your warrior cluster.')
+parser.add_argument('-k', '--key', help='AWS key.')
+parser.add_argument('-s', '--secret', help='AWS secret.')
+parser.add_argument('-r', '--region', help='The AWS region to operate in.', required=True)
+parser.add_argument('-l', '--lines', type=int, help='Number of lines of console output to show from each warrior.')
+options = parser.parse_args()
+
+# Try grab AWS credentials from ENV variables if set
+creds = {}
+creds["key"] = options.key if options.key else os.environ.get("AWS_ACCESS_KEY_ID")
+creds["secret"] = options.secret if options.secret else os.environ.get("AWS_SECRET_ACCESS_KEY")
+
+termination_marker = 'request-canceled-and-instance-running'
+lines = options.lines if options.lines > 10 else 10
+
+print "Collecting information about your spot instances in %s..." % options.region
+
+# Create a connection to specified region
+if not creds["key"] or not creds["secret"]:
+    print "AWS key and secret must be set."
+    exit(1)
+
+conn = boto.ec2.connect_to_region(options.region,
+            aws_access_key_id=creds["key"], aws_secret_access_key=creds["secret"])
+
+# Collect instances
+instances = {}
+reservations = conn.get_all_instances(filters={
+    'instance-lifecycle':'spot',
+    'instance-state-name': 'running'
+})
+for reservation in reservations:
+    for instance in reservation.instances:
+        instances[instance.id] = instance.public_dns_name
+
+if len(instances) == 0:
+    print "Found no spot instances, exiting..."
+    exit(0)
+
+response = raw_input("Found %s running spot instances - continue? (y/n) " % len(instances))
+if response.strip() != 'y':
+    print "Okay, exiting."
+    exit(1)
+
+print "Running machine checks. This could take a while if there's a lot of instances..."
+
+inventory_manager = inventory.Inventory(instances.values())
+
+results = ansible.runner.Runner(
+    inventory=inventory_manager,
+    module_name="command",
+    module_args="find /var/log/supervisor/ -name 'warrior-stdout*' -exec tail -n %s {} +" % (lines),
+    remote_user="ubuntu",
+    sudo=True,
+    transport="ssh",
+    ).run()
+
+if 'dark' in results:
+    if len(results['dark']) > 0:
+        print "Contact failures:"
+        for host, reason in results['dark'].iteritems():
+            print "  %s (%s)" % (host, reason['msg'])
+
+terminate = []
+for hostname, machine in results['contacted'].iteritems():
+    print "\nConsole output from warrior:"
+    print "----------------------------"
+    if machine['stdout']:
+        print machine['stdout']
+    else:
+        print "No output, this probably means the warrior failed to initialize at all."
+    print "----------------------------\n"
+    response = raw_input("Terminate this warrior? (y/n) ")
+    if response.strip() != 'y':
+        print "Warrior will continue."
+    else:
+        terminate.append(hostname)
+        print "Warrior queued for termination."
+
+# Create a connection to specified region
+conn = boto.ec2.connect_to_region(options.region,
+            aws_access_key_id=creds["key"], aws_secret_access_key=creds["secret"])
+
+# Get all spot instances in this region
+spots = {}
+spot_requests = conn.get_all_spot_instance_requests()
+for spot in spot_requests:
+    spots[spot.instance_id] = spot.id
+
+if len(terminate) == 0:
+    print "No instances marked for termination, exiting..."
+    exit(0)
+
+# Check with user
+response = raw_input("Issue cancellations for %d spot instances? (y/n) " % len(terminate))
+if response.strip() != 'y':
+    print "Okay, exiting."
+    exit(0)
+
+for hostname in terminate:
+    # Find specified instance
+    reservations = conn.get_all_instances(filters={'dns-name':hostname})
+    for reservation in reservations:
+        for instance in reservation.instances:
+            if spots[instance.id] != None:
+                # Found instance, let's issue cancellation
+                print "Issuing spot request cancellation for", instance.id, "..."
+                conn.cancel_spot_instance_requests(spots[instance.id])
+            else:
+                print "Couldn't find a spot request for %s" % instance.id
+                del spots[instance.id]
+
+
+# Get all spot instance requests in this region
+spot_requests = conn.get_all_spot_instance_requests(filters={'status-code': termination_marker})
+
+# Check with user
+response = raw_input("Terminate %s instances marked '%s' in %s? (y/n) " % (len(spot_requests), termination_marker, options.region))
+if response.strip() != 'y':
+    print "Okay, exiting."
+    exit(0)
+
+spots = [spot.instance_id for spot in spot_requests]
+conn.terminate_instances(spots)
+
+print "Done!"
