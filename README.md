@@ -31,6 +31,14 @@ You can also set these on the command line:
 ./slayer --key=<your access key> --secret=<your secret key> --region=us-east-1
 ```
 
+You'll also need to make your SSH key for the instances available with `ssh-agent`:
+
+```
+ssh-agent
+ssh-add ~/your-key.pem
+ssh-add ~/your-other-key.pem
+```
+
 ## Running slayer
 
 It's pretty simple:
