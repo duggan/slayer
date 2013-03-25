@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import os
+import time
 import readline
 from argparse import ArgumentParser
 import boto.ec2
@@ -106,6 +107,7 @@ if response.strip() != 'y':
     print "Okay, exiting."
     exit(0)
 
+issued = 0
 for hostname in terminate:
     # Find specified instance
     reservations = conn.get_all_instances(filters={'dns-name':hostname})
@@ -115,14 +117,18 @@ for hostname in terminate:
                 # Found instance, let's issue cancellation
                 print "Issuing spot request cancellation for", instance.id, "..."
                 conn.cancel_spot_instance_requests(spots[instance.id])
+                issued += 1
             else:
                 print "Couldn't find a spot request for %s" % instance.id
                 del spots[instance.id]
 
+# Wait until we have something to kill
+while len(conn.get_all_spot_instance_requests(filters={'status-code': termination_marker})) < issued:
+    print "Waiting for cancellation requests to propagate..."
+    time.sleep(5)
 
 # Get all spot instance requests in this region
 spot_requests = conn.get_all_spot_instance_requests(filters={'status-code': termination_marker})
-
 # Check with user
 response = raw_input("Terminate %s instances marked '%s' in %s? (y/n) " % (len(spot_requests), termination_marker, options.region))
 if response.strip() != 'y':
