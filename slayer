@@ -47,8 +47,8 @@ class SpotRequestCancellation:
         return int(self.failed)
 
     def completed(self):
-        while(self.connection.get_all_spot_instance_requests(
-            filters={'status-code': self.termination_marker})) < (self.issued + self.failed):
+        while(len(self.connection.get_all_spot_instance_requests(
+            filters={'status-code': self.termination_marker})) < (self.issued + self.failed)):
             print "Waiting for cancellation requests to propagate..."
             time.sleep(5)
 
