@@ -179,7 +179,6 @@ def main():
                 for host, reason in results['dark'].iteritems():
                     print "  %s (%s)" % (host, reason['msg'])
 
-        spot_request_cancel = SpotRequestCancellation(options, os.environ)
         terminate = InstanceTermination(options, os.environ)
 
         for hostname, machine in results['contacted'].iteritems():
@@ -193,7 +192,6 @@ def main():
             if not Console.prompt("Terminate this warrior?"):
                 print "Warrior will continue."
             else:
-                spot_request_cancel.add(spot_id)
                 terminate.add(hostname)
                 print "Warrior queued for termination."
 
@@ -201,9 +199,11 @@ def main():
             print "No instances marked for termination."
         else:
             # Terminate corresponding spot requests
+            spot_request_cancel = SpotRequestCancellation(options, os.environ)
             for spot_id, details in spot_requests.iteritems():
                 if 'host' in details and details['host'] in terminate.hosts():
                     spot_request_cancel.add(spot_id)
+
             spot_request_cancel.process()
             spot_request_cancel.completed()
 
