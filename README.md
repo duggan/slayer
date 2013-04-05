@@ -19,6 +19,8 @@ git clone git@github.com:duggan/slayer.git
 cd slayer
 ```
 
+or [download a zip](https://github.com/duggan/slayer/archive/master.zip).
+
 You will need your AWS access key and secret key in the environment, or
 supplied on the command line.
 
